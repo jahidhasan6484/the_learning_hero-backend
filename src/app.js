@@ -11,6 +11,9 @@ app.use(cors());
 app.use("/api/public/uploads", express.static("public/uploads"));
 
 // Routes
+const userRoutes = require("./app/modules/user/user.routes");
+
+app.use("/api/user", userRoutes);
 
 app.get("/", (req, res) => {
   try {
