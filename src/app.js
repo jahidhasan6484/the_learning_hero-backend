@@ -2,18 +2,28 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 require("dotenv").config();
-
 const app = express();
 
-app.use(bodyParser.urlencoded({ extended: true }));
+// Set the body-parser limit to 10MB (adjust the size as needed)
+app.use(bodyParser.json({ limit: "10mb" }));
+app.use(
+  bodyParser.urlencoded({
+    limit: "10mb",
+    extended: true,
+    parameterLimit: 50000,
+  })
+);
 app.use(express.json());
 app.use(cors());
-app.use("/api/public/uploads", express.static("public/uploads"));
 
 // Routes
 const userRoutes = require("./app/modules/user/user.routes");
+const courseRoutes = require("./app/modules/course/course.routes");
+const paymentRoutes = require("./app/modules/payment/payments.routes");
 
 app.use("/api/user", userRoutes);
+app.use("/api/course", courseRoutes);
+app.use("/api/payment", paymentRoutes);
 
 app.get("/", (req, res) => {
   try {

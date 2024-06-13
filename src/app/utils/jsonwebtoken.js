@@ -18,7 +18,6 @@ const tokenValidation = async (req, res, next) => {
   }
 
   try {
-    // Remove "Bearer " prefix from the token
     const tokenWithoutBearer = token.split(" ")[1];
 
     // Verify the token
