@@ -1,6 +1,6 @@
 const transport = require("./nodemailer.transporter");
 
-const sendEmail = (_subject, _to, title, fee) => {
+const sendEmail = (_subject, _to, name, title, fee) => {
   return new Promise((resolve, reject) => {
     try {
       const mailOptions = {
@@ -9,7 +9,7 @@ const sendEmail = (_subject, _to, title, fee) => {
         subject: _subject,
         html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Dear Valued Customer,</h2>
+        <h2>Dear ${name},</h2>
         <p>Thank you for your recent purchase. We're excited to confirm that your transaction has been successfully processed. Here are the details of your purchase:</p>
         <ul>
           <li><strong>Course:</strong> ${title}</li>

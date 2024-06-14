@@ -22,9 +22,9 @@ const payNow = async (req, res) => {
       total_amount: payInfo.fee,
       currency: "BDT",
       tran_id: transactionId, // use unique tran_id for each api call
-      success_url: `${process.env.SERVER}/payment/success?transactionId=${transactionId}`,
-      fail_url: `${process.env.SERVER}/payment/fail?transactionId=${transactionId}`,
-      cancel_url: `${process.env.SERVER}/payment/cancel?transactionId=${transactionId}`,
+      success_url: `${process.env.SERVER}/api/payment/success?transactionId=${transactionId}`,
+      fail_url: `${process.env.SERVER}/api/payment/fail?transactionId=${transactionId}`,
+      cancel_url: `${process.env.SERVER}/api/payment/cancel?transactionId=${transactionId}`,
       ipn_url: "http://localhost:3030/ipn",
       shipping_method: "Courier",
       product_name: "Course Fee",
@@ -103,6 +103,7 @@ const paymentSuccess = async (req, res) => {
       await sendEmail(
         "Confirmation of Your Course Purchase",
         user.email,
+        user.name,
         course.title,
         result.fee
       );
