@@ -1,8 +1,10 @@
+const Payment = require("../payment/payment.model");
 const Course = require("./course.model");
 
 const addNewCourse = async (req, res) => {
   try {
-    const { title, description, instructor, fee, bannerURL } = req.body;
+    const { title, description, instructor, fee, bannerURL, videoURL } =
+      req.body;
     const authorId = req._id;
 
     if (
@@ -11,6 +13,7 @@ const addNewCourse = async (req, res) => {
       !instructor ||
       !fee ||
       !bannerURL ||
+      !videoURL ||
       !authorId
     ) {
       return res.status(400).json({ message: "All fields are required." });
@@ -22,6 +25,7 @@ const addNewCourse = async (req, res) => {
       instructor,
       fee,
       bannerURL,
+      videoURL,
       authorId,
     });
 
@@ -29,6 +33,9 @@ const addNewCourse = async (req, res) => {
 
     res.status(201).json({ message: "New course added successfully" });
   } catch (error) {
+    if (error.message.includes(`The value of "offset" is out of range`)) {
+      return res.status(500).json({ message: "Too large files" });
+    }
     res.status(500).json({ message: "Internal server error" });
   }
 };
@@ -110,32 +117,19 @@ const getACourse = async (req, res) => {
       return res.status(404).json({ message: "Course not found" });
     }
 
-    res.status(200).json({ data: course });
-  } catch (error) {
-    res.status(500).json({ message: "Failed to fetch course" });
-  }
-};
+    // Count the number of paid enrollments for this course
+    const enrollmentCount = await Payment.countDocuments({
+      courseId,
+      paid: true,
+    });
 
-const getACourseWithSuggestion = async (req, res) => {
-  try {
-    const { courseId } = req.query;
+    // Include enrollments in the course data
+    const courseData = {
+      ...course.toObject(),
+      enrollments: enrollmentCount,
+    };
 
-    if (!courseId) {
-      return res.status(400).json({ message: "Course ID is required" });
-    }
-
-    const course = await Course.findById(courseId);
-
-    if (!course) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
-    const allCourses = await Course.find({ _id: { $ne: courseId } });
-
-    const shuffled = allCourses.sort(() => 0.5 - Math.random());
-    const suggestions = shuffled.slice(0, 4);
-
-    res.status(200).json({ data: course, suggestions });
+    res.status(200).json({ data: courseData });
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch course" });
   }
@@ -162,9 +156,101 @@ const updateACourse = async (req, res) => {
 
     res.json({ message: "Course updated successfully" });
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "An error occurred while updating the course" });
+    if (error.message.includes(`The value of "offset" is out of range`)) {
+      return res.status(500).json({ message: "Too large files" });
+    }
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getMyEnrolledCourses = async (req, res) => {
+  try {
+    const userId = req._id;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Find all paid payments for the user
+    const payments = await Payment.find({ userId, paid: true });
+
+    if (!payments.length) {
+      return res.status(404).json({ message: "No enrolled courses found" });
+    }
+
+    // Extract the course IDs from the payments
+    const courseIds = payments.map((payment) => payment.courseId);
+
+    const enrolledCourses = await Course.find({ _id: { $in: courseIds } });
+
+    res.status(200).json({ data: enrolledCourses });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch enrolled courses" });
+  }
+};
+
+const paymentHistory = async (req, res) => {
+  try {
+    const userId = req._id;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    // Find all paid payments for the user
+    const payments = await Payment.find({ userId, paid: true });
+
+    if (!payments.length) {
+      return res.status(404).json({ message: "No enrolled courses found" });
+    }
+
+    // Extract course IDs from payments
+    const courseIds = payments.map((payment) => payment.courseId);
+
+    // Fetch course titles
+    const courses = await Course.find({ _id: { $in: courseIds } }, "title");
+
+    const courseTitleMap = {};
+    courses.forEach((course) => {
+      courseTitleMap[course._id.toString()] = course.title;
+    });
+
+    const paymentData = payments.map((payment) => ({
+      ...payment.toObject(),
+      title: courseTitleMap[payment.courseId.toString()],
+    }));
+
+    res.status(200).json({ data: paymentData });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch payment history" });
+  }
+};
+
+const haveAccess = async (req, res) => {
+  try {
+    const userId = req._id;
+    const { courseId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    if (!courseId) {
+      return res.status(400).json({ message: "Course ID is required" });
+    }
+
+    // Check if the user has paid for the course
+    const payment = await Payment.findOne({ userId, courseId, paid: true });
+
+    if (payment) {
+      return res.status(200).json({ access: true });
+    } else {
+      return res
+        .status(403)
+        .json({ access: false, message: "Purchase course to play video" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Failed to check access" });
   }
 };
 
@@ -175,5 +261,7 @@ module.exports = {
   getAllCourse,
   getACourse,
   updateACourse,
-  getACourseWithSuggestion,
+  getMyEnrolledCourses,
+  paymentHistory,
+  haveAccess,
 };

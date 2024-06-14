@@ -27,6 +27,11 @@ const courseSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    videoURL: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     authorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

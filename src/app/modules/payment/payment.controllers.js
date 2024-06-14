@@ -2,6 +2,8 @@ const { ObjectId } = require("mongodb");
 const SSLCommerzPayment = require("sslcommerz-lts");
 const Payment = require("./payment.model");
 const User = require("../user/user.model");
+const Course = require("../course/course.model");
+const { sendEmail } = require("../../utils/nodemailer.controllers");
 
 const IS_LIVE = false;
 
@@ -35,7 +37,7 @@ const payNow = async (req, res) => {
       cus_state: "Dhaka",
       cus_postcode: "1000",
       cus_country: "Bangladesh",
-      cus_phone: "01711111111",
+      cus_phone: payInfo.phone,
       ship_name: user.name,
       ship_add1: "Dhaka",
       ship_city: "Dhaka",
@@ -86,6 +88,24 @@ const paymentSuccess = async (req, res) => {
     );
 
     if (result.paid == true) {
+      // Find the user to get the email
+      const user = await User.findById(result?.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Find the course to get the title
+      const course = await Course.findById(result?.courseId);
+      if (!course) {
+        return res.status(404).json({ message: "Course not found" });
+      }
+
+      await sendEmail(
+        "Confirmation of Your Course Purchase",
+        user.email,
+        course.title,
+        result.fee
+      );
       res.redirect(
         `${process.env.CLIENT}/payment/success?transactionId=${transactionId}`
       );
@@ -127,9 +147,53 @@ const paymentCancel = async (req, res) => {
   }
 };
 
+const getTransactionDetails = async (req, res) => {
+  try {
+    const userId = req._id;
+    const { transactionId } = req.query;
+
+    if (!transactionId) {
+      return res.status(400).json({ message: "Transaction ID is required" });
+    }
+
+    const payment = await Payment.findOne({ transactionId, userId });
+
+    if (!payment) {
+      return res.status(404).json({ message: "Transaction not found" });
+    }
+
+    // Find the user to get the email
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Find the course to get the title
+    const course = await Course.findById(payment.courseId);
+    if (!course) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
+    const transactionDetails = {
+      transactionId: payment.transactionId,
+      fee: payment.fee,
+      courseId: payment.courseId,
+      title: course.title,
+      email: user.email,
+    };
+
+    return res.status(200).json({ data: transactionDetails });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch transaction details",
+    });
+  }
+};
+
 module.exports = {
   payNow,
   paymentSuccess,
   paymentFail,
   paymentCancel,
+  getTransactionDetails,
 };
